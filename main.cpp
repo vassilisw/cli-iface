@@ -26,15 +26,26 @@ std::vector<std::string> split(const std::string& input, char separator)
 
 int main()
 {
-    ra::CommandTree tree;
-    tree.insert({ "git", "add" }, [](){ std::cout << "Executing git add"; });
-    tree.insert({ "git", "commit" }, [](){ std::cout << "Executing git commit"; });
-    tree.insert({ "docker", "run" }, [](){ std::cout << "Executing docker run"; });
-    tree.insert({ "docker", "build" }, [](){ std::cout << "Executing docker build"; });
+    using Params = ra::CommandTree::Params;
 
-    tree.insert({ "playlist", "add" }, [](){ std::cout << "!playlist add"; });
-    tree.insert({ "playlist", "remove" }, [](){ std::cout << "!playlist remove"; });
-    tree.insert({ "playlist", "insert" }, [](){ std::cout << "!playlist input"; });
+    ra::CommandTree tree;
+    tree.remainderPathAsParams = false; //? ref[asparamsonins]
+    
+    tree.insert({}, [](const Params& params){ std::cout << "Empty!!"; });
+
+    tree.insert({ "git", "add" }, [](const Params& params){ std::cout << "Executing git add"; });
+    tree.insert({ "git", "commit" }, [](const Params& params){ std::cout << "Executing git commit"; });
+    tree.insert({ "docker", "run" }, [](const Params& params){ std::cout << "Executing docker run"; });
+    tree.insert({ "docker", "build" }, [](const Params& params){ std::cout << "Executing docker build"; });
+
+    tree.insert({ "playlist", "add" }, [](const Params& params){ std::cout << "!playlist add"; });
+    tree.insert({ "playlist", "remove" }, [](const Params& params){ std::cout << "!playlist remove"; });
+
+    tree.insert({ "playlist", "insert" }, [](const Params& params){
+        std::cout << "!playlist insert with params: ";
+        for (const auto& s : params)
+            std::cout << s << " ";
+    });
 
     //
     CliAutoComplete cli;
@@ -42,7 +53,8 @@ int main()
     cli.onKeyEnter = [&tree](std::string& input) {
         if (auto node = tree.find(split(input, ' '))) {
             std::cout << std::endl << std::flush;
-            node->execute();
+            if (!node->execute())
+                std::cout << "no action";
         }
     };
 

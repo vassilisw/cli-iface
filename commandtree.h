@@ -16,28 +16,37 @@ namespace ra
 {
     class CommandTree
     {
-        using Func = std::function<void()>;
-
     public:
+        using Params = std::vector<std::string>;
+        using Func = std::function<void(const Params& params)>;
+
         // Insert a command path with an associated function at the leaf
         void insert(const std::vector<std::string>& path, Func func, size_t index = 0)
         {
             if (index == path.size()) {
                 action_ = std::move(func); // store function at leaf node
+                //TODO update remainderPathAsParams // ref[asparamsonins]
                 return;
             }
             children_[path[index]].insert(path, std::move(func), index + 1);
         }
 
         // Find the node corresponding to path (returns nullptr if not found)
-        const CommandTree* find(const std::vector<std::string>& path, size_t index = 0) const
+        const CommandTree* find(const std::vector<std::string>& path, size_t index = 0)
         {
             if (index == path.size())
                 return this;
 
             auto it = children_.find(path[index]);
-            if (it == children_.end())
-                return nullptr;
+            if (it == children_.end()) {
+                if (remainderPathAsParams) {
+                    actionParams_ = Params(path.cbegin() + index, path.cend());
+                    return this;
+                }
+                else {
+                    return nullptr;
+                }
+            }
             
             return it->second.find(path, index + 1);
         }
@@ -46,7 +55,7 @@ namespace ra
         bool execute() const
         {
             if (action_) {
-                (*action_)();
+                (*action_)(actionParams_);
                 return true;
             }
 
@@ -104,7 +113,9 @@ namespace ra
             }
             else {
                 auto it = children_.find(path[index]);
-                if (it == children_.end()) return false; // nothing to remove
+                if (it == children_.end())
+                    return false; // nothing to remove
+
                 bool emptyChild = it->second.remove(path, index + 1);
                 if (emptyChild)
                     children_.erase(it);
@@ -120,10 +131,10 @@ namespace ra
             CommandTree tree;
 
             // Insert some commands with associated functions
-            tree.insert({ "git", "add" }, []() { std::cout << "Executing git add\n"; });
-            tree.insert({ "git", "commit" }, []() { std::cout << "Executing git commit\n"; });
-            tree.insert({ "docker", "run" }, []() { std::cout << "Executing docker run\n"; });
-            tree.insert({ "docker", "build" }, []() { std::cout << "Executing docker build\n"; });
+            tree.insert({ "git", "add" }, [](const Params& params) { std::cout << "Executing git add\n"; });
+            tree.insert({ "git", "commit" }, [](const Params& params) { std::cout << "Executing git commit\n"; });
+            tree.insert({ "docker", "run" }, [](const Params& params) { std::cout << "Executing docker run\n"; });
+            tree.insert({ "docker", "build" }, [](const Params& params) { std::cout << "Executing docker build\n"; });
 
             // Simulate user input
             std::vector<std::vector<std::string>> testPaths = {
@@ -170,9 +181,12 @@ namespace ra
             tree.remove({ "git", "add" });
         }
 
+        bool remainderPathAsParams = true;
+
         private:
             std::map<std::string, CommandTree> children_;
             std::optional<Func> action_; // execute if this node is a leaf
+            Params actionParams_;
     };
 
 
